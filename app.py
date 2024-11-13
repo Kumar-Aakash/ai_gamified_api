@@ -7,6 +7,7 @@ import os
 
 load_dotenv()
 
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
@@ -108,3 +109,8 @@ async def generate_report(report_request: ReportRequest):
 
     report = get_ai_response(report_prompt)
     return {"report": report}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
