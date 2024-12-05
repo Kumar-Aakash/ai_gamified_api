@@ -440,12 +440,12 @@ class FlashcardRequest(BaseModel):
 
 def generate_flashcards(content: str, num_flashcards: int):
     """
-    Generate flashcards from the given content.
+    Generate flashcards from the given content using OpenAI.
     """
     prompt = (
-        f"Create {num_flashcards} concise and informative flashcards based on the following content. "
-        f"Each flashcard should have a heading and a short description (4-5 lines)."
-        f"\n\nContent:\n{content}\n\nFlashcards:"
+        f"Create {num_flashcards} concise and informative flashcards in JSON format based on the following content. "
+        f"Each flashcard should have a 'heading' and a 'description' field. Ensure the JSON is valid and formatted as a list of objects."
+        f"\n\nContent:\n{content}\n\nJSON Format:"
     )
 
     try:
@@ -458,49 +458,37 @@ def generate_flashcards(content: str, num_flashcards: int):
             temperature=0.7
         )
         flashcards_text = response.choices[0].message['content'].strip()
-        return flashcards_text
+
+        import json
+        flashcards = json.loads(flashcards_text)
+        return flashcards
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse OpenAI response as JSON.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/generate-flashcards")
 async def generate_flashcards_endpoint(request: FlashcardRequest):
     """
     Endpoint to generate flashcards based on the given content and number of cards.
     """
-    flashcards_text = generate_flashcards(request.content, request.num_flashcards)
-    flashcards = []
-    current_heading = ""
-    current_description = ""
+    flashcards = generate_flashcards(request.content, request.num_flashcards)
 
-    import re
-    lines = flashcards_text.split("\n")
-
-    for line in lines:
-        line = line.strip()
-        if re.match(r"^Flashcard\s+\d+:$", line):
-            if current_heading or current_description:
-                flashcards.append({
-                    "heading": current_heading.strip(),
-                    "description": current_description.strip()
-                })
-                current_heading, current_description = "", ""
-        elif line.lower().startswith("heading:"):
-            current_heading = line.replace("Heading:", "").strip()
-        elif line.lower().startswith("description:"):
-            current_description = line.replace("Description:", "").strip()
-        elif line:
-            current_description += f" {line}"
-
-    if current_heading or current_description:
-        flashcards.append({
-            "heading": current_heading.strip(),
-            "description": current_description.strip()
-        })
-
-    if not flashcards:
+    if not flashcards or not isinstance(flashcards, list):
         return {"error": "No valid flashcards could be generated. Please check the input content or OpenAI response."}
 
-    return {"flashcards": flashcards}
+    valid_flashcards = [
+        {"heading": fc.get("heading", "").strip(), "description": fc.get("description", "").strip()}
+        for fc in flashcards
+        if "heading" in fc and "description" in fc
+    ]
+
+    if not valid_flashcards:
+        return {"error": "Generated flashcards are incomplete or invalid."}
+
+    return {"flashcards": valid_flashcards}
+
 
 if __name__ == "__main__":
     import uvicorn
