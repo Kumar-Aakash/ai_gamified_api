@@ -2,7 +2,6 @@ import openai
 from dotenv import load_dotenv
 import os
 
-# Set up OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_questions(context):
@@ -51,48 +50,38 @@ def ask_initial_question():
     return industry_options[industry_choice]
 
 def main():
-    # Context to keep track of answers
     context = {
         "industry": ask_initial_question(),
         "answers": []
     }
 
     print(f"\nYou selected: {context['industry']}\n")
-
-    # Generate all questions and options in a single API call
+    
     questions_text = generate_questions(context)
-
-    # Process the questions and options
     questions = []
     current_question = ""
     current_options = []
-
     lines = questions_text.split('\n')
     for line in lines:
         line = line.strip()
         if not line:
             continue
         if line[0].isdigit() and '.' in line:
-            # It's a question
             if current_question:
                 questions.append({'question': current_question, 'options': current_options})
                 current_options = []
             current_question = line
         elif line.startswith('-'):
-            # It's an option
             current_options.append(line)
         else:
-            # Continuation of options or questions without numbering
             if current_options:
                 current_options[-1] += ' ' + line
             else:
                 current_question += ' ' + line
 
-    # Append the last question
     if current_question:
         questions.append({'question': current_question, 'options': current_options})
 
-    # Ask each question and collect answers
     for idx, q in enumerate(questions, 1):
         print(f"\n{q['question']}")
         for opt_idx, option in enumerate(q['options'], 1):
@@ -100,7 +89,6 @@ def main():
         answer = input("Select an option (you can select multiple by separating numbers with commas): ")
         context['answers'].append((q['question'], answer))
 
-    # Generate final report based on collected answers
     report_prompt = f"Generate a visionary and strategic AI impact report for a business in the {context['industry']} sector based on the following details:"
     for idx, (question, answer) in enumerate(context['answers'], start=1):
         report_prompt += f"\nQuestion {idx}: {question}\nAnswer: {answer}"
